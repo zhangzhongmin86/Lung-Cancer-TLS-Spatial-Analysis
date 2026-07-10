@@ -4,9 +4,38 @@ Analysis code for the manuscript **“A tumor-proximal EPAS1-high lipid-stress n
 
 ## Repository contents
 
-- `figure*.R`: R scripts used for main and supplementary figures.
-- `figure*.ipynb`: Python notebooks used for spatial, metabolic, immunotherapy and regulatory-network analyses.
+- `R/main_figures/`: R scripts used for main figures 1 and 2.
+- `R/supplementary_figures/`: R scripts used for supplementary figures.
+- `notebooks/main_figures/`: Python notebooks used for main figures 4–6.
+- `notebooks/supplementary_figures/`: Python notebooks used for supplementary analyses.
 - `commune/`: scripts and notebooks implementing the COMMUNE workflow.
+
+```text
+.
+├── R/
+│   ├── main_figures/
+│   └── supplementary_figures/
+├── notebooks/
+│   ├── main_figures/
+│   └── supplementary_figures/
+├── commune/
+├── .gitignore
+└── README.md
+```
+
+### Main analysis index
+
+| Analysis | Code |
+| --- | --- |
+| Atlas construction and overview | `R/main_figures/figure1.R` |
+| Cell-composition analysis | `R/main_figures/figure2.R` |
+| TLS identification | `notebooks/main_figures/figure4-Identifying TLS.ipynb` |
+| Tumor-region classification | `notebooks/main_figures/figure4-Regional grouping.ipynb` |
+| Immunotherapy validation | `notebooks/main_figures/figure5-Immunotherapy.ipynb` |
+| Metabolic analysis | `notebooks/main_figures/figure5-Metabolic Differences.ipynb` |
+| Regulatory-network analysis | `notebooks/main_figures/figure5-pyscenic.ipynb` |
+| Spatial multi-omic visualization | `notebooks/main_figures/figure6.ipynb` |
+| COMMUNE workflow | `commune/` |
 
 ## Data availability
 
