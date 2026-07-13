@@ -1,6 +1,6 @@
 # Lung-Cancer-TLS-Spatial-Analysis
 
-Analysis code for the manuscript **“A tumor-proximal EPAS1-high lipid-stress niche diverts tertiary lymphoid structure maturation in lung adenocarcinoma.”**
+Analysis code for the accompanying manuscript.
 
 ## Repository contents
 

@@ -141,7 +141,5 @@ CellChat, remain subject to their respective licenses.
 
 ## Citation
 
-If you use COMMUNE, cite the accompanying manuscript, "A tumor-proximal
-EPAS1-high lipid-stress niche diverts tertiary lymphoid structure maturation
-in lung adenocarcinoma." Repository
+If you use COMMUNE, cite the accompanying manuscript. Repository
 metadata are also provided in `CITATION.cff`.
