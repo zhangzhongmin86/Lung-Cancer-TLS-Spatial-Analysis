@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use COMMUNE, please cite the accompanying manuscript."
+title: "COMMUNE: ecologically constrained multicellular communication modules"
+type: software
+authors:
+  - family-names: Zhang
+    given-names: Zhongmin
+  - family-names: Tian
+    given-names: Luyi
+license: MIT
+repository-code: "https://github.com/zhangzhongmin86/Lung-Cancer-TLS-Spatial-Analysis"
+date-released: 2026-07-13
+version: 1.0.0

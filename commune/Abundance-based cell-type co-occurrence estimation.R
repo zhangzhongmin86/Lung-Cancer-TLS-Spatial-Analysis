@@ -1,117 +1,139 @@
-# Portable project path. Set TLS_PROJECT_ROOT to the directory containing the input data.
-PROJECT_ROOT <- normalizePath(Sys.getenv("TLS_PROJECT_ROOT", unset = "."), winslash = "/", mustWork = FALSE)
+#!/usr/bin/env Rscript
 
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(tidyr)
+  library(tibble)
+})
 
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(forcats)
-library(ggpubr)
-library(stringr)
-library(tibble)
+`%||%` <- function(x, y) if (is.null(x)) y else x
 
-# ---- 读数据
-obs_file <- "/data/beifen/zhongmin/泛癌S/h5ad/189数据/combined_adata_innerobs.csv"
-metadata <- read.csv(obs_file, row.names = 1, check.names = TRUE)
+parse_args <- function(args) {
+  out <- list()
+  i <- 1
+  while (i <= length(args)) {
+    key <- sub("^--", "", args[[i]])
+    if (i == length(args) || startsWith(args[[i + 1]], "--")) {
+      out[[key]] <- TRUE
+      i <- i + 1
+    } else {
+      out[[key]] <- args[[i + 1]]
+      i <- i + 2
+    }
+  }
+  out
+}
 
-# ---- 免疫细胞定义（用 celltype_1 判断）
-immune_ct1 <- c("T cells","Monocyte_macrophage","B cells","NK cells",
-                "Plasma cells","DC","Mast cells","Neutrophils","pDC")
+arg <- parse_args(commandArgs(trailingOnly = TRUE))
+required <- c("metadata", "output-dir")
+missing <- required[!required %in% names(arg)]
+if (length(missing) > 0) {
+  stop("Missing required arguments: ", paste(paste0("--", missing), collapse = ", "))
+}
 
-# ---- 只保留“既有免疫、又有非免疫”的样本
+metadata_file <- normalizePath(arg[["metadata"]], mustWork = TRUE)
+out_dir <- arg[["output-dir"]]
+corr_cutoff <- as.numeric(arg[["correlation-cutoff"]] %||% "0.3")
+adjusted_p_cutoff <- as.numeric(arg[["adjusted-p-cutoff"]] %||% "0.05")
+min_samples <- as.integer(arg[["min-samples"]] %||% "3")
+groups_requested <- if (!is.null(arg[["groups"]])) {
+  strsplit(arg[["groups"]], ",", fixed = TRUE)[[1]]
+} else {
+  NULL
+}
+
+metadata <- read.csv(
+  metadata_file,
+  row.names = 1,
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+required_columns <- c("sample", "group", "celltype_1", "celltype_3")
+missing_columns <- setdiff(required_columns, colnames(metadata))
+if (length(missing_columns) > 0) {
+  stop("Metadata is missing columns: ", paste(missing_columns, collapse = ", "))
+}
+
+immune_celltype_1 <- c(
+  "T cells", "Myeloid cells", "B cells", "NK cells", "NKT cells", "Plasma cells"
+)
+
 sample_ok <- metadata %>%
+  filter(!is.na(sample), !is.na(celltype_3), celltype_3 != "", celltype_3 != "nan") %>%
   group_by(sample) %>%
   summarise(
-    has_immune   = any(celltype_1 %in% immune_ct1),
-    has_nonimmune= any(!(celltype_1 %in% immune_ct1)),
+    has_immune = any(celltype_1 %in% immune_celltype_1),
+    has_nonimmune = any(!(celltype_1 %in% immune_celltype_1)),
     .groups = "drop"
   ) %>%
   filter(has_immune & has_nonimmune) %>%
   pull(sample)
 
-dat <- metadata %>% filter(sample %in% sample_ok)
-
-# ---- 输出目录
-out_dir <- "/data/beifen/zhongmin/泛癌S/h5ad/癌和癌旁比较细胞类型/计算细胞之间的相关性"
-dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
-
-# ---- 相关性分级（用于 Correlation_type 字段）
-corr_label <- function(r){
-  case_when(
-    r >= 0.70 ~ "Strong positive",
-    r >= 0.50 ~ "Moderate positive",
-    r >= 0.30 ~ "Weak positive",
-    r <= -0.70 ~ "Strong negative",
-    r <= -0.50 ~ "Moderate negative",
-    r <= -0.30 ~ "Weak negative",
-    TRUE ~ "None"
-  )
+dat <- metadata %>%
+  filter(sample %in% sample_ok, !is.na(group), !is.na(celltype_3), celltype_3 != "")
+if (!is.null(groups_requested)) {
+  dat <- dat %>% filter(group %in% groups_requested)
+}
+if (nrow(dat) == 0) {
+  stop("No cells remain after immune/non-immune and group filtering.")
 }
 
-# ---- 按组循环计算
-all_groups <- sort(unique(dat$group))
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+unlink(list.files(
+  out_dir,
+  pattern = "^specificity_correlation_.*[.]csv$",
+  full.names = TRUE
+))
+all_results <- list()
 
-for (g in sort(unique(dat$group))) {
-  df_g <- dat %>%
-    dplyr::filter(group == g) %>%
-    dplyr::mutate(
-      sample    = as.character(sample),
-      celltype_3 = as.character(celltype_3)
+safe_name <- function(x) gsub("[^A-Za-z0-9._-]+", "_", x)
+
+for (group_name in sort(unique(dat$group))) {
+  group_data <- dat %>%
+    filter(group == group_name) %>%
+    transmute(sample = as.character(sample), celltype_3 = as.character(celltype_3))
+
+  sample_count <- n_distinct(group_data$sample)
+  if (sample_count < min_samples) {
+    message("[skip] ", group_name, ": only ", sample_count, " samples")
+    next
+  }
+
+  denominator <- count(group_data, sample, name = "total_cells")
+  proportion_wide <- group_data %>%
+    count(sample, celltype_3, name = "n") %>%
+    left_join(denominator, by = "sample") %>%
+    mutate(proportion = n / total_cells) %>%
+    select(sample, celltype_3, proportion) %>%
+    pivot_wider(names_from = celltype_3, values_from = proportion, values_fill = 0) %>%
+    arrange(sample)
+
+  abundance <- as.matrix(proportion_wide[, -1, drop = FALSE])
+  abundance <- abundance[, apply(abundance, 2, sd, na.rm = TRUE) > 0, drop = FALSE]
+  if (ncol(abundance) < 2) {
+    message("[skip] ", group_name, ": fewer than two variable cell types")
+    next
+  }
+
+  pairs <- combn(colnames(abundance), 2, simplify = FALSE)
+  results <- bind_rows(lapply(pairs, function(pair) {
+    x <- abundance[, pair[[1]]]
+    y <- abundance[, pair[[2]]]
+    keep <- is.finite(x) & is.finite(y)
+    if (sum(keep) < min_samples) return(NULL)
+    test <- suppressWarnings(cor.test(x[keep], y[keep], method = "pearson"))
+    tibble(
+      Cell_Type_1 = pair[[1]],
+      Cell_Type_2 = pair[[2]],
+      Correlation = unname(test$estimate),
+      P_value = test$p.value,
+      N = sum(keep)
     )
-  
-  # 按样本计总细胞数（分母）
-  denom <- dplyr::count(df_g, sample, name = "total_cells")
-  
-  # 每样本 x celltype_3 计数
-  cnt <- dplyr::count(df_g, sample, celltype_3, name = "n")
-  
-  # 样本内比例 = 该 celltype_3 数量 / 该样本总细胞数
-  prop_wide <- cnt %>%
-    dplyr::left_join(denom, by = "sample") %>%
-    dplyr::mutate(prop = n / total_cells) %>%
-    dplyr::select(sample, celltype_3, prop) %>%
-    tidyr::pivot_wider(names_from = celltype_3, values_from = prop, values_fill = 0) %>%
-    dplyr::arrange(sample)
-  
-  if (ncol(prop_wide) <= 2) {
-    message(sprintf("[skip] %s: 有效细胞类型列太少，未生成结果。", g))
-    next
-  }
-  
-  mat <- as.matrix(prop_wide[, -1, drop = FALSE])
-  
-  keep <- apply(mat, 2, sd, na.rm = TRUE) > 0
-  mat  <- mat[, keep, drop = FALSE]
-  if (ncol(mat) < 2) {
-    message(sprintf("[skip] %s: 方差>0 的细胞类型 < 2，未生成结果。", g))
-    next
-  }
-  
-  ct_names <- colnames(mat)
-  pairs <- combn(ct_names, 2, simplify = FALSE)
-  
-  res_list <- lapply(pairs, function(p) {
-    x <- mat[, p[1]]; y <- mat[, p[2]]
-    ok <- is.finite(x) & is.finite(y)
-    if (sum(ok) < 3) return(NULL)
-    ct <- suppressWarnings(cor.test(x[ok], y[ok], method = "pearson"))
-    tibble::tibble(
-      Cell_Type_1 = p[1],
-      Cell_Type_2 = p[2],
-      Correlation = as.numeric(ct$estimate),
-      P_value     = as.numeric(ct$p.value),
-      N           = sum(ok)
-    )
-  })
-  
-  res <- dplyr::bind_rows(res_list)
-  if (nrow(res) == 0) {
-    message(sprintf("[skip] %s: 无法计算有效相关。", g))
-    next
-  }
-  
-  res <- res %>%
-    dplyr::mutate(
+  }))
+
+  if (nrow(results) == 0) next
+  results <- results %>%
+    mutate(
       Adjusted_p_value = p.adjust(P_value, method = "BH"),
       Correlation_type = case_when(
         Correlation >= 0.70 ~ "Strong positive",
@@ -121,14 +143,24 @@ for (g in sort(unique(dat$group))) {
         Correlation <= -0.50 ~ "Moderate negative",
         Correlation <= -0.30 ~ "Weak negative",
         TRUE ~ "None"
-      )
+      ),
+      group = group_name
     ) %>%
-    dplyr::filter(Correlation > 0.3, P_value < 0.05) %>%
-    dplyr::select(Cell_Type_1, Cell_Type_2, Correlation, P_value, Adjusted_p_value, Correlation_type) %>%
-    dplyr::arrange(dplyr::desc(Correlation), P_value)
-  
-  out_file <- file.path(out_dir, paste0("specificity_correlation_", g, ".csv"))
-  write.csv(res, out_file, row.names = FALSE)
-  message("Saved: ", out_file)
+    filter(Correlation > corr_cutoff, Adjusted_p_value < adjusted_p_cutoff) %>%
+    arrange(desc(Correlation), Adjusted_p_value)
+
+  output_file <- file.path(
+    out_dir,
+    paste0("specificity_correlation_", safe_name(group_name), ".csv")
+  )
+  write.csv(results %>% select(-group), output_file, row.names = FALSE, quote = TRUE)
+  all_results[[group_name]] <- results
+  message("Saved ", nrow(results), " supported pairs: ", output_file)
 }
 
+combined <- bind_rows(all_results)
+write.csv(combined, file.path(out_dir, "cooccurrence_all_groups.csv"), row.names = FALSE)
+writeLines(
+  capture.output(sessionInfo()),
+  con = file.path(out_dir, "sessionInfo.txt")
+)
