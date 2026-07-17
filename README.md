@@ -31,6 +31,7 @@ Analysis code for the accompanying manuscript.
 | Cell-composition analysis | `R/main_figures/figure2.R` |
 | TLS identification | `notebooks/main_figures/figure4-Identifying TLS.ipynb` |
 | Tumor-region classification | `notebooks/main_figures/figure4-Regional grouping.ipynb` |
+| TLS trajectory classification | `notebooks/main_figures/Fig5_TLS_classification.ipynb` and `R/main_figures/Fig5_TLS_classification_mfuzz.R` |
 | Immunotherapy validation | `notebooks/main_figures/figure5-Immunotherapy.ipynb` |
 | Metabolic analysis | `notebooks/main_figures/figure5-Metabolic Differences.ipynb` |
 | Regulatory-network analysis | `notebooks/main_figures/figure5-pyscenic.ipynb` |
