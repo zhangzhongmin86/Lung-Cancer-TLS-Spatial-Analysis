@@ -1,0 +1,44 @@
+# Raw and processed data
+data/
+results/
+outputs/
+figures/
+source_data/
+
+# Large scientific data formats
+*.h5ad
+*.h5
+*.hdf5
+*.loom
+*.rds
+*.RData
+*.mtx
+*.mtx.gz
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.bam
+*.bai
+*.cram
+*.tar
+*.tar.gz
+
+# Notebook, Python and R working files
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.Rhistory
+.Rproj.user/
+
+# Credentials and local configuration
+.env
+.env.*
+config.local.*
+*.key
+*.pem
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+

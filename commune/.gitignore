@@ -1,0 +1,17 @@
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
+*.Rhistory
+*.RData
+example_data/*.h5ad
+example_data/*.mtx
+example_data/*.mtx.gz
+example_data/*.csv
+example_data/*.tsv
+example_data/*.json
+!example_data/commune_demo.h5ad
+!example_data/manifest.json
+nr-software-policy-filled.pdf
+nr-software-policy-responses.md
+main_manuscript.docx
+nr-software-policy.pdf

@@ -1,0 +1,17 @@
+{
+  "source": "demonstration subset of the single-cell atlas described in the accompanying manuscript",
+  "groups": [
+    "Normal",
+    "Tumor"
+  ],
+  "samples_per_group": 20,
+  "cells_per_sample": 100,
+  "max_celltypes_per_sample": 12,
+  "seed": 20250713,
+  "shape_cells_by_genes": [
+    4000,
+    20498
+  ],
+  "nonzero_entries": 5809650,
+  "selected_samples": 40
+}
